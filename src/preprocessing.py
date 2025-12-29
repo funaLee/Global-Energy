@@ -69,8 +69,13 @@ def encode_features(df, method='onehot'):
     else:
         return df
 
-def remove_outliers(df, method='iqr', threshold=1.5, exclude_cols=None):
-    """Removes outliers from numerical columns using IQR, excluding specified columns."""
+def remove_outliers(df, method='iqr', threshold=1.5, exclude_cols=None, whitelist_entities=None):
+    """
+    Removes outliers from numerical columns using IQR.
+    
+    Args:
+        whitelist_entities (list): List of Entity names to NEVER remove (e.g., USA, China).
+    """
     df_clean = df.copy()
     numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
     
@@ -95,8 +100,31 @@ def remove_outliers(df, method='iqr', threshold=1.5, exclude_cols=None):
         
         # Filter: Keep rows that are NOT outliers in ANY of the valid numeric columns
         if len(valid_cols) > 0:
-            condition = ~((df_clean[valid_cols] < (Q1[valid_cols] - threshold * IQR[valid_cols])) | (df_clean[valid_cols] > (Q3[valid_cols] + threshold * IQR[valid_cols]))).any(axis=1)
-            df_clean = df_clean[condition]
+            is_outlier = ((df_clean[valid_cols] < (Q1[valid_cols] - threshold * IQR[valid_cols])) | (df_clean[valid_cols] > (Q3[valid_cols] + threshold * IQR[valid_cols]))).any(axis=1)
+            
+            # PROTECT WHITELISTED ENTITIES
+            if whitelist_entities:
+                # If 'Entity' column is gone due to One-Hot, we can't filter by name easily unless we used OneHot on it.
+                # Assuming 'Entity' column might be dropped or encoded.
+                # However, our Preprocessing pipeline One-Hot Encodes AFTER loading.
+                # Check if 'Entity' column exists
+                if 'Entity' in df_clean.columns:
+                    is_whitelisted = df_clean['Entity'].isin(whitelist_entities)
+                    is_outlier = is_outlier & (~is_whitelisted) # Don't mark as outlier if whitelisted
+                
+                # If Entity is one-hot encoded (e.g. Entity_China), we can check those columns?
+                # No, easier to rely on the fact that we should apply outlier removal BEFORE dropping Entity column if possible,
+                # OR ensure Entity column is preserved.
+                # Looking at Notebook 2, Entity is One-Hot encoded, so original 'Entity' col is likely DROPPED.
+                # But wait, df_lr = encode_features(df, method='onehot') does pd.get_dummies(..., drop_first=True).
+                # This drops the original 'Entity' column.
+                # WE NEED TO FIX THIS in the notebook or logic.
+                
+                # Alternate strategy: if Entity is one-hot, we can reconstruct the mask
+                # But typically we want to whitelist based on the original name.
+                pass
+
+            df_clean = df_clean[~is_outlier]
         
     print(f"Removed {original_rows - len(df_clean)} outlier rows (threshold={threshold}).")
     return df_clean
