@@ -1383,6 +1383,113 @@ XGBoost học được các patterns này và **sửa lỗi** cho LR.
 
 
 
+### 6.8. So sánh Độ phức tạp Model: Linear vs Hybrid
+
+**Mục tiêu**: Phân tích trade-off giữa độ phức tạp (số tham số, thời gian training) và hiệu suất.
+
+#### A. Công thức Tính Số Tham số
+
+##### 1. Ridge Linear Regression (Global LR)
+
+**Công thức:**
+$$P_{LR} = n_{features} + 1 \text{ (intercept)}$$
+
+**Cấu trúc features trong báo cáo này:**
+| Loại | Số lượng | Mô tả |
+|------|----------|-------|
+| **Macro Features** | 18 | GDP, Energy, CO2_lag1, Geographic... |
+| **Entity One-Hot** | 174 | Binary indicator cho 174 quốc gia |
+| **Intercept** | 1 | Hằng số $\beta_0$ |
+
+**Tính toán:**
+$$P_{LR} = 18 \text{ (macro)} + 174 \text{ (Entity One-Hot)} + 1 \text{ (intercept)} = \mathbf{193} \text{ tham số}$$
+
+> [!NOTE]
+> **Tại sao là 174 Entity thay vì 175?**  
+> One-Hot Encoding với `drop_first=True` loại bỏ 1 cột để tránh multicollinearity. Quốc gia đầu tiên (theo alphabet, ví dụ Afghanistan) được dùng làm baseline.
+
+---
+
+##### 2. XGBoost (Gradient Boosted Trees)
+
+**Công thức:**
+$$P_{XGB} = n_{trees} \times P_{tree}$$
+
+Trong đó mỗi cây quyết định (Decision Tree) có:
+$$P_{tree} = n_{internal} \times 2 + n_{leaves}$$
+
+Với:
+- $n_{leaves} = 2^{max\_depth}$ (số lá tối đa)
+- $n_{internal} = 2^{max\_depth} - 1$ (số node nội bộ)
+- Mỗi internal node lưu: **1 feature index + 1 threshold = 2 params**
+- Mỗi leaf lưu: **1 prediction value = 1 param**
+
+**Tính toán chi tiết cho Hybrid XGBoost:**
+
+| Thành phần | Công thức | Giá trị |
+|------------|-----------|---------|
+| `max_depth` | (hyperparameter) | 3 |
+| Số leaves/tree | $2^3$ | 8 |
+| Số internal nodes/tree | $2^3 - 1$ | 7 |
+| Params/tree | $7 \times 2 + 8$ | **22** |
+| Số trees (`n_estimators`) | (hyperparameter) | 500 |
+| **Tổng XGBoost** | $500 \times 22$ | **~11,000** |
+
+---
+
+##### 3. Tổng hợp
+
+| Model | Công thức | Số Tham số |
+|-------|-----------|------------|
+| **Global LR** | $18 + 174 + 1$ | **193** |
+| **Hybrid LR** | $18 + 1$ (không One-Hot) | 19 |
+| **Hybrid XGBoost** | $500 \times 22$ | ~11,000 |
+| **Hybrid Total** | $19 + 11,000$ | **~11,019** |
+
+> [!WARNING]
+> **Lưu ý về implementation:**  
+> Script `save_hybrid_model.py` hiện tại chỉ dùng 18 macro features (không có Entity One-Hot) cho Hybrid model. Để fair comparison với Global LR (193 params), cần retrain Hybrid với đầy đủ 192 features.
+
+**So sánh thực tế:**
+| Model | Params | Tỷ lệ |
+|-------|--------|-------|
+| Global LR (với One-Hot) | **193** | 1x (baseline) |
+| Hybrid (hiện tại, không One-Hot) | ~11,019 | ~57x |
+| Hybrid (nếu có One-Hot) | ~11,193 | ~58x |
+
+#### B. So sánh Hiệu suất
+
+| Model | R² Score | Median MAPE | Training Time |
+|-------|----------|-------------|---------------|
+| **Global LR** | 0.9993 | 50.08% | ~0.1s |
+| **Hybrid (LR+XGB)** | 0.9992 | **19.99%** | ~30s |
+
+#### C. Trade-off Analysis
+
+| Metric | Thay đổi | Đánh giá |
+|--------|----------|----------|
+| Parameters | +57x (193 → 11,019) | Tăng đáng kể nhưng chấp nhận được |
+| MAPE | **-60%** | ⭐ Cải thiện lớn |
+| R² | ~0% | Giữ nguyên |
+| Training Time | +300x | Chỉ chạy 1 lần (offline) |
+| Inference Time | ~1x | Không ảnh hưởng |
+
+#### D. Kết luận
+
+> [!IMPORTANT]
+> **Hybrid Model ĐÁNG để training** vì:
+> 1. **Giảm 60% sai số** cho quốc gia điển hình (50% → 20%)
+> 2. Training chỉ chạy **1 lần** (offline), inference vẫn nhanh (ms-level)
+> 3. R² vẫn giữ nguyên **0.999** → không mất global accuracy
+
+**Khuyến nghị sử dụng:**
+- 📱 **Edge/Embedded devices**: Dùng **Global LR** (nhẹ, 18 params)
+- 🔬 **Policy/Research**: Dùng **Hybrid** (chính xác hơn, ~11,019 params)
+
+---
+
+
+
 ## 7. Kết luận Tổng thể
 
 ### 7.1. Best Model Rankings
