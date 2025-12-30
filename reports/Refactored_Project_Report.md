@@ -516,20 +516,24 @@ svr_model.fit(X_train_scaled, y_train)
 | **Log Transform** | Giảm skewness cho kernel hoạt động tốt hơn |
 
 **Kết quả thực tế:**
-| Metric | Giá trị | Nhận xét |
-|--------|---------|----------|
-| R² (Random Split) | **-0.05** | ❌ Thất bại |
-| R² (Time-Series Split) | **-0.04** | ❌ Thất bại |
+| Metric | Random Split | Time-Series Split | Degradation |
+|--------|--------------|-------------------|-------------|
+| R² (Pooled) | **0.990** | **0.626** | **-36.7%** |
+| R² (Panel) | **0.991** | **0.622** | **-37.2%** |
 
 > [!CAUTION]
-> **SVR thất bại hoàn toàn!** (R² âm = worse than mean prediction)
+> **SVR: Excellent Interpolation, Poor Extrapolation**
 > 
-> **Nguyên nhân:**
-> 1. **Hyperparameters chưa tune**: C=1.0 mặc định không phù hợp
-> 2. **Scale mismatch**: Target range 10 → 10,000,000 kt quá lớn
-> 3. **Curse of dimensionality**: 193 features với RBF kernel
+> **Kết quả:**
+> - Random Split: R² = 0.99 (Rất tốt!)
+> - Time-Series Split: R² = 0.62 (Giảm 36-37%)
 > 
-> **Bài học:** SVR không phải plug-and-play, cần extensive tuning.
+> **Nguyên nhân sụt giảm:**
+> 1. **Không ngoại suy tốt**: Giống XGBoost, SVR với RBF kernel không thể dự đoán giá trị ngoài phạm vi training
+> 2. **Kernel limitation**: RBF kernel chỉ "nhớ" các patterns đã thấy trong training
+> 3. **Overfitting to interpolation**: Model quá tốt cho nội suy nhưng thất bại khi forecasting
+> 
+> **Bài học:** SVR phù hợp cho **interpolation** (điền khoảng trống), không phù hợp cho **forecasting** (dự báo tương lai).
 
 ---
 
@@ -728,36 +732,57 @@ tscv = TimeSeriesSplit(n_splits=5)
 
 | Thuật toán | Random R² | Random MAPE | TS R² | TS MAPE | Δ R² | Δ MAPE | Kết luận |
 |---|---|---|---|---|---|---|---|
-| **SVR** | -0.05 | N/A | -0.04 | N/A | ~0 | N/A | ❌ Thất bại cả hai |
+| **SVR** | **0.990** | N/A | **0.626** | N/A | **-36.7%** | N/A | ⚠️ Không ngoại suy |
 | **XGBoost** | **0.998** | 13.09% | **0.793** | 30.74% | **-20.5%** | **+135%** | ⚠️ Bẫy Nội suy |
 | **Linear Regression** | **0.999** | 35.82% | **0.999** | 50.08% | **0%** | +40% | ✅ Robust |
 
 #### B. Phân tích Chi tiết từng Thuật toán
 
-##### 🔴 SVR: Thất bại Hoàn toàn (R² < 0)
+##### � SVR:: Excellent Interpolation, Poor Forecasting
 
 **Kết quả:**
-| Metric | Random Split | Time-Series Split |
-|--------|--------------|-------------------|
-| R² | -0.05 | -0.04 |
-| Interpretation | Worse than mean | Worse than mean |
+| Metric | Random Split | Time-Series Split | Degradation |
+|--------|--------------|-------------------|-------------|
+| R² (Pooled) | 0.990 | 0.626 | **-36.7%** |
+| R² (Panel) | 0.991 | 0.622 | **-37.2%** |
+| Interpretation | Excellent | Poor | Massive drop |
 
-**Nguyên nhân thất bại:**
+**Tại sao Random Split cao?**
 
-1. **Hyperparameters không tối ưu:**
-   - `C=1.0` (default) quá nhỏ cho range của target (10 → 10,000,000)
-   - `gamma='scale'` không phù hợp với 193 features
-   
-2. **Scale mismatch:**
-   - Target range: $10^6$ lần (Tuvalu 10 kt → China 10 triệu kt)
-   - RobustScaler không đủ để normalize
+SVR với RBF kernel hoạt động tốt khi:
+- Dữ liệu test nằm **trong phạm vi** training data
+- Có thể "nội suy" giữa các điểm đã học
 
-3. **Curse of Dimensionality:**
-   - 193 features với RBF kernel → Distance metrics không meaningful
-   - Kernel matrix trở nên sparse
+**Tại sao Time-Series Split thấp?**
+
+Giống XGBoost, SVR **không thể ngoại suy**:
+```
+Training: GDP từ 1,000 → 50,000 USD
+          CO2 từ 10,000 → 500,000 kt
+
+Test 2019: GDP = 60,000 USD (chưa thấy bao giờ!)
+
+SVR dự đoán: Dựa trên kernel similarity với training points
+→ Không thể dự đoán chính xác giá trị ngoài range
+→ R² giảm từ 0.99 → 0.62
+```
+
+**So sánh SVR vs XGBoost:**
+
+| Aspect | SVR | XGBoost |
+|--------|-----|---------|
+| Random Split R² | 0.990 | 0.998 |
+| Time-Series R² | 0.626 | 0.793 |
+| Degradation | -36.7% | -20.5% |
+| Extrapolation | ❌ Worse | ❌ Poor |
+
+**Kết luận:**
+- SVR **tốt hơn** cho interpolation (R² = 0.99)
+- SVR **tệ hơn XGBoost** cho forecasting (0.62 vs 0.79)
+- Cả hai đều **không phù hợp** cho dự báo tương lai
 
 **Bài học:**
-> SVR **không phải plug-and-play**. Cần extensive hyperparameter tuning (GridSearch với C ∈ [0.1, 1000], gamma ∈ [0.001, 1]).
+> SVR với RBF kernel là **interpolation champion**, nhưng **forecasting disaster** - thậm chí tệ hơn XGBoost khi dự báo tương lai.
 
 ---
 
@@ -1138,8 +1163,8 @@ $$\epsilon_{total} \approx \sum_{i=1}^{T} \beta_{lag}^{T-i} \cdot \delta_i$$
 
 | Experiment | Kết quả | Bài học |
 |------------|---------|---------|
-| **Random vs TS Split** | XGB sụt 20%, LR stable | Time-Series Split là **bắt buộc** |
-| **SVR** | R² < 0 | SVR cần extensive tuning |
+| **Random vs TS Split** | SVR sụt 37%, XGB sụt 20%, LR stable | Time-Series Split là **bắt buộc** |
+| **SVR** | R² = 0.99 (Random) → 0.62 (TS) | SVR không ngoại suy, chỉ tốt cho interpolation |
 | **XGBoost** | Cannot extrapolate | Trees = Interpolation only |
 | **Clustering** | Fairness gap 12% → 84% | Global model **công bằng hơn** |
 | **LMM** | R² = 0.04 | Quá ít data per country |
@@ -1545,7 +1570,7 @@ def load_hybrid_model(load_dir: str = 'models/') -> dict:
 | **Hybrid Global** | **0.9992** | **19.99%** | 298% | 26,221 | 9,876 | ~11,019 |
 | Ridge LR Standalone | 0.9993 | 50.08% | 631% | 28,177 | 12,543 | 193 |
 | XGBoost Standalone | 0.9955 | 11.04% | 89% | 35,410 | 11,234 | ~11,000 |
-| SVR (RBF) | -0.04 | N/A | N/A | N/A | N/A | N/A |
+| SVR (RBF) | 0.626 | N/A | N/A | 488,420 | 89,980 | 198 |
 
 ![Hybrid Model Comparison](figures/hybrid_model_comparison.png)
 
