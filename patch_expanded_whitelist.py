@@ -12,6 +12,12 @@ print("--- CRITICAL FIX: Expanding Whitelist to Rescue Major Economies ---")
 # 1. Pipeline Simulation
 df = load_data('data/processed/common_preprocessed.csv')
 
+# CRITICAL: Remove 2020 data (Known data quality issue)
+if 'Year' in df.columns:
+    original_len = len(df)
+    df = df[df['Year'] != 2020]
+    print(f"Removed {original_len - len(df)} rows of 2020 data.")
+
 # EXPANDED WHITELIST (G20 + Major Regional Powers)
 # Original: ['China', 'United States', 'India', 'Russian Federation', 'Japan', 'Germany', 'Brazil', 'Canada']
 # New Additions based on 'dropped_entities_report': 
