@@ -16,6 +16,89 @@
 
 ---
 
+## NOTEBOOKS - HƯỚNG DẪN SỬ DỤNG
+
+Dự án được tổ chức thành 10 notebooks theo thứ tự logic từ khám phá dữ liệu đến xây dựng model cuối cùng:
+
+### 📊 Giai đoạn 1: Khám phá và Tiền xử lý
+
+**01_Data_Exploration.ipynb**
+- **Mục đích**: Khám phá dữ liệu ban đầu, phân tích thống kê mô tả
+- **Nội dung**: Kiểm tra missing values, phân phối dữ liệu, outliers, correlation
+- **Output**: Hiểu tổng quan về dataset, xác định vấn đề cần xử lý
+
+**02_Preprocessing_Pipeline.ipynb**
+- **Mục đích**: Xây dựng quy trình tiền xử lý dữ liệu hoàn chỉnh
+- **Nội dung**: Xử lý missing values, log transform, tạo lag features, encoding
+- **Output**: File `common_preprocessed.csv` - dữ liệu sạch cho tất cả models
+
+### 🧪 Giai đoạn 2: Thử nghiệm và So sánh
+
+**03_Phase0_Random_vs_TimeSeries.ipynb**
+- **Mục đích**: Chứng minh "bẫy nội suy" - Random Split vs Time-Series Split
+- **Nội dung**: So sánh 3 thuật toán (LR, SVR, XGBoost) với 2 cách chia dữ liệu
+- **Output**: Phát hiện XGBoost và SVR giảm 20-36% khi dùng Time-Series Split
+
+**04_Phase1_Global_LR_Baseline.ipynb**
+- **Mục đích**: Xây dựng baseline với Linear Regression toàn cục
+- **Nội dung**: Train Ridge Regression, phân tích feature importance, đánh giá MAPE
+- **Output**: Baseline R² = 0.999, Median MAPE = 50%
+
+**05_Phase2_Hyperparameter_Tuning.ipynb**
+- **Mục đích**: Tối ưu hóa hyperparameters cho các models
+- **Nội dung**: GridSearchCV với TimeSeriesSplit cho LR, XGBoost
+- **Output**: Best alpha = 10.0 (LR), best params cho XGBoost
+
+### 🎯 Giai đoạn 3: Thử nghiệm Nâng cao
+
+**06_Phase3_KMeans_Clustering.ipynb**
+- **Mục đích**: Thử nghiệm phân cụm quốc gia và train model riêng
+- **Nội dung**: K-Means clustering, train model cho từng cluster
+- **Output**: Phát hiện clustering làm tăng "fairness gap" (12% → 84%)
+
+**07_Phase4_Recursive_Forecasting.ipynb**
+- **Mục đích**: Kiểm tra khả năng dự báo nhiều năm liên tiếp
+- **Nội dung**: So sánh One-Step vs Recursive forecasting
+- **Output**: LR collapse (R² 0.99 → 0.44), cần giải pháp mới
+
+### 🚀 Giai đoạn 4: Giải pháp Cuối cùng
+
+**08_Phase5_RealWorld_Validation.ipynb**
+- **Mục đích**: Kiểm chứng model với dữ liệu thực tế 2020-2023
+- **Nội dung**: Fetch data từ World Bank API và OWID, validate model
+- **Output**: External R² = 0.94, model robust với COVID-19
+
+**09_Fairness_Robustness.ipynb**
+- **Mục đích**: Phân tích công bằng và độ tin cậy của model
+- **Nội dung**: MAPE theo nhóm quốc gia, phân tích micro-states
+- **Output**: Model tốt cho 90% emissions, thất bại cho micro-states
+
+**10_Hybrid_Model.ipynb** ⭐
+- **Mục đích**: Xây dựng giải pháp cuối cùng - Hybrid Model
+- **Nội dung**: LR (trend) + XGBoost (residuals), recursive forecasting
+- **Output**: **Median MAPE giảm 60%** (50% → 20%), R² = 0.999, recursive stable
+
+---
+
+### 📝 Cách sử dụng Notebooks
+
+**Chạy theo thứ tự**:
+```
+01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09 → 10
+```
+
+**Hoặc chạy nhanh**:
+- Chỉ muốn xem kết quả cuối: Chạy **10_Hybrid_Model.ipynb**
+- Muốn hiểu quy trình: Chạy **01 → 02 → 04 → 10**
+- Muốn hiểu "bẫy nội suy": Chạy **03**
+
+**Yêu cầu**:
+- Python 3.8+
+- Packages: pandas, numpy, sklearn, xgboost, matplotlib
+- Dữ liệu: `data/processed/` (được tạo từ notebook 02)
+
+---
+
 ## 1. GIỚI THIỆU DỰ ÁN
 
 ### 1.1. Vấn đề cần giải quyết
@@ -395,7 +478,87 @@ Dự đoán: [105, 195, 305, 395, 505]
 → R² = 0.998 (Rất tốt!)
 ```
 
+---
+
 **Metric 2: MAPE (Mean Absolute Percentage Error)**
+
+### 📊 MAPE là gì và tại sao quan trọng?
+
+**Định nghĩa đơn giản**: MAPE đo "sai bao nhiêu phần trăm so với giá trị thực"
+
+**Công thức**:
+```
+MAPE = |Giá trị thực - Giá trị dự đoán| / Giá trị thực × 100%
+```
+
+**Ví dụ cụ thể**:
+
+```
+Ví dụ 1: Dự đoán tốt
+Vietnam năm 2019:
+- Thực tế: 200,000 tấn CO2
+- Dự đoán: 220,000 tấn
+- Sai số: 20,000 tấn
+- MAPE = 20,000/200,000 × 100% = 10%
+
+→ Sai 10% là khá tốt!
+```
+
+```
+Ví dụ 2: Dự đoán tệ
+Tuvalu năm 2019:
+- Thực tế: 10 tấn CO2
+- Dự đoán: 10,000 tấn
+- Sai số: 9,990 tấn
+- MAPE = 9,990/10 × 100% = 99,900%
+
+→ Sai gần 100,000% là rất tệ!
+```
+
+**Ý nghĩa của MAPE**:
+
+| MAPE | Đánh giá | Ví dụ thực tế |
+|------|----------|---------------|
+| **< 10%** | ⭐⭐⭐ Xuất sắc | Dự báo thời tiết 1 ngày |
+| **10-20%** | ⭐⭐ Tốt | Dự báo kinh tế ngắn hạn |
+| **20-50%** | ⭐ Chấp nhận được | Dự báo dài hạn |
+| **> 50%** | ❌ Kém | Không đáng tin cậy |
+| **> 100%** | ❌❌ Rất tệ | Sai nhiều hơn giá trị thực! |
+
+**Tại sao MAPE quan trọng?**
+
+1. **Dễ hiểu**: "Sai 20%" dễ hiểu hơn "Sai 50,000 tấn"
+2. **So sánh được**: MAPE 20% cho Vietnam và USA có thể so sánh trực tiếp
+3. **Thực tế**: Policy makers quan tâm đến % sai, không phải số tuyệt đối
+
+**Ví dụ so sánh**:
+```
+Quốc gia A:
+- Thực tế: 1,000,000 tấn
+- Dự đoán: 1,100,000 tấn
+- Sai số: 100,000 tấn
+- MAPE: 10%
+
+Quốc gia B:
+- Thực tế: 10,000 tấn
+- Dự đoán: 11,000 tấn
+- Sai số: 1,000 tấn
+- MAPE: 10%
+
+→ Cả hai đều sai 10%, mặc dù sai số tuyệt đối khác nhau 100 lần!
+```
+
+**Khi nào MAPE cao?**
+- Model không học được pattern của quốc gia đó
+- Dữ liệu quốc gia đó quá ít
+- Quốc gia có đặc điểm khác biệt (outlier)
+
+**Khi nào MAPE thấp?**
+- Model hiểu rõ pattern của quốc gia
+- Dữ liệu đầy đủ và chất lượng
+- Quốc gia có xu hướng ổn định
+
+---
 
 **Ý nghĩa**: Sai số trung bình theo %
 
@@ -708,6 +871,75 @@ Sai số tích lũy: +30,000 tấn!
 ---
 
 ## 5. GIẢI PHÁP: HYBRID MODEL
+
+### 💡 Động lực: Tại sao cần Hybrid Model?
+
+**Nhìn lại những gì đã phát hiện từ các model lẻ:**
+
+| Model | Ưu điểm ⭐ | Nhược điểm ❌ |
+|-------|-----------|---------------|
+| **Linear Regression** | • Ngoại suy tốt (dự báo tương lai xa)<br>• Recursive stable (không sụp đổ)<br>• Đơn giản, nhanh, dễ giải thích | • MAPE cao (50%)<br>• Bỏ sót pattern phức tạp<br>• Sai số lớn cho từng quốc gia |
+| **XGBoost** | • MAPE thấp (11%)<br>• Bắt được pattern phi tuyến<br>• Chính xác cho one-step | • Không ngoại suy được<br>• Recursive collapse<br>• "Nhớ" thay vì "hiểu" |
+| **SVR** | • Tốt cho nội suy (R² = 0.99)<br>• Bắt pattern phi tuyến | • Giảm 36% khi dự báo (R² = 0.62)<br>• Không ngoại suy tốt<br>• Chậm |
+
+**Câu hỏi đặt ra**: Có cách nào lấy được **ưu điểm của cả hai** (LR + XGBoost) mà tránh được nhược điểm?
+
+**Quan sát then chốt**:
+
+```
+🔍 Phân tích sai số của Linear Regression:
+
+Khi nhìn vào các dự đoán sai của LR, ta phát hiện:
+- LR bắt được "khung lớn" (trend): GDP ↑ → CO2 ↑
+- Nhưng LR bỏ sót "chi tiết nhỏ":
+  • USA giảm CO2 nhanh hơn trend (chuyển năng lượng sạch)
+  • China tăng CO2 chậm hơn trend (chính sách môi trường)
+  • Vietnam có pattern riêng (công nghiệp hóa)
+
+→ Sai số của LR KHÔNG PHẢI ngẫu nhiên!
+→ Sai số có PATTERN có thể học được!
+```
+
+**Ý tưởng đột phá**:
+
+Thay vì bỏ đi sai số, ta **dùng XGBoost để học pattern của sai số**!
+
+```
+Bước 1: LR dự đoán "khung lớn"
+        → Dự đoán = 80,000 tấn
+        → Thực tế = 100,000 tấn
+        → Sai số = +20,000 tấn
+
+Bước 2: XGBoost học: "Khi nào LR sai +20,000?"
+        → Phát hiện: Khi GDP tăng đột biến + Renewable% thấp
+        → XGBoost dự đoán sai số = +18,000 tấn
+
+Bước 3: Kết hợp
+        → Hybrid = LR + XGBoost
+        → Hybrid = 80,000 + 18,000 = 98,000 tấn
+        → Chỉ sai 2,000 tấn (2%)!
+```
+
+**Tại sao cách này hoạt động?**
+
+1. **LR cung cấp "nền tảng" ổn định**:
+   - Có thể ngoại suy (dự báo xa)
+   - Không bị collapse khi recursive
+   - Bắt được xu hướng dài hạn
+
+2. **XGBoost "tinh chỉnh" chi tiết**:
+   - Học pattern phức tạp của sai số
+   - Không cần ngoại suy (chỉ sửa sai số nhỏ)
+   - Bù đắp điểm yếu của LR
+
+3. **Kết hợp = Best of both worlds**:
+   - Vừa đi xa được (nhờ LR)
+   - Vừa chính xác (nhờ XGBoost)
+   - Vừa ổn định recursive (LR làm nền)
+
+**Đây chính là cách các AI Engineer thực thụ giải quyết bài toán thực tế!**
+
+---
 
 ### 5.1. Ý tưởng cốt lõi
 
