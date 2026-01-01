@@ -13,9 +13,9 @@ Các notebooks được tổ chức theo thứ tự logic của báo cáo `Final
 | 05 | `05_Phase2_Hyperparameter_Tuning.ipynb` | GridSearchCV với TimeSeriesSplit | Section 4.7 |
 | 06 | `06_Phase3_KMeans_Clustering.ipynb` | K-Means clustering + cluster-based models | Section 4.4, 4.9 |
 | 07 | `07_Phase4_Recursive_Forecasting.ipynb` | Multi-step ahead forecasting | Section 4.11 |
-| 08 | `08_Phase5_RealWorld_Validation.ipynb` | Validation với World Bank API (2020-2023) | Section 4.10 |
-| 09 | `09_Fairness_Robustness.ipynb` | Rolling CV, Feature Importance, Fairness | Section 4.8, 4.12-4.14 |
-| 10 | `10_Hybrid_Model.ipynb` | Hybrid Model (LR + XGBoost) | Section 6 |
+| 08 | `08_Phase5_Hybrid_Model.ipynb` | Hybrid Model (LR + XGBoost) | Section 6 |
+| 09 | `09_RealWorld_Validation.ipynb` | Validation với World Bank API (2020-2023) | Section 4.10 |
+| 10 | `10_Fairness_Robustness.ipynb` | Rolling CV, Feature Importance, Fairness | Section 4.8, 4.12-4.14 |
 
 ## Cách sử dụng
 
